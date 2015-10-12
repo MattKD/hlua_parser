@@ -1,0 +1,82 @@
+Modified Lua 5.2 Grammar
+
+chunk ::= block
+
+block ::= {stat} [retstat]
+
+stat ::=  ‘;’ | 
+   varlist ‘=’ explist | 
+   functioncall | 
+   label | 
+   break | 
+   goto Name | 
+   do block end | 
+   while exp do block end | 
+   repeat block until exp | 
+   if exp then block {elseif exp then block} [else block] end | 
+   for Name ‘=’ exp ‘,’ exp [‘,’ exp] do block end | 
+   for namelist in explist do block end | 
+   function funcname funcbody | 
+   local function Name funcbody | 
+   local namelist [‘=’ explist] 
+
+retstat ::= return [explist] [‘;’]
+
+label ::= ‘::’ Name ‘::’
+
+funcname ::= Name {‘.’ Name} [‘:’ Name]
+
+varlist ::= var {‘,’ var}
+
+var ::=  
+  Name {tblLookup} | 
+  functioncall tblLookup {tblLookup} |
+  '(' exp ')' tblLookup {tblLookup} 
+
+namelist ::= Name {‘,’ Name}
+
+explist ::= exp {‘,’ exp}
+
+exp ::= 'nil' {expTail} | 'false' {expTail} | 'true' {expTail} | 
+        Number {expTail} | String {expTail} | '...' {expTail} | 
+        functiondef {expTail} | prefixexp {expTail} | 
+        tableconstructor {expTail} | unop exp {expTail}  
+
+expTail ::= binop exp 
+
+prefixexp ::= Name {tblLookup} | functioncall {tblLookup} |
+              '(' exp ')' {tblLookup}  
+
+tblLookup ::= '[' exp ']' | '.' Name
+
+functioncall ::= Name {tblLookup} fcallArgs {functioncallTail} |
+                 '(' exp ')' {tblLookup} fcallArgs {functioncallTail}
+
+functioncallTail ::= {tblLookup} fcallArgs 
+
+fcallArgs ::= args | ':' Name args
+
+args ::=  ‘(’ [explist] ‘)’ | tableconstructor | String 
+
+functiondef ::= function funcbody
+
+funcbody ::= ‘(’ [parlist] ‘)’ block end
+
+parlist ::= namelist [‘,’ ‘...’] | ‘...’
+
+tableconstructor ::= ‘{’ [fieldlist] ‘}’
+
+fieldlist ::= field {fieldsep field} [fieldsep]
+
+field ::= ‘[’ exp ‘]’ ‘=’ exp | Name ‘=’ exp | exp
+
+fieldsep ::= ‘,’ | ‘;’
+
+binop ::= ‘+’ | ‘-’ | ‘*’ | ‘/’ | ‘^’ | ‘%’ | ‘..’ | 
+   ‘<’ | ‘<=’ | ‘>’ | ‘>=’ | ‘==’ | ‘~=’ | 
+   and | or
+
+unop ::= ‘-’ | not | ‘#’
+
+
+
