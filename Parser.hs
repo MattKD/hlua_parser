@@ -1,15 +1,29 @@
 -- Lua 5.2 Parser using Parsec
 -- Matt Donovan
 
-module LuaParser
+module Parser
 ( parseFile
 , parseString
+, Chunk(..)
+, Stat(..)
+, RetStat(..)
+, Var(..)
+, Exp(..)
+, ExpTail(..)
+, PExp(..)
+, TblLookup(..)
+, FnCall(..)
+, FnCallTail(..)
+, FnCallArgs(..)
+, Args(..)
+, FuncBody(..)
+, ParList(..)
+, Field(..)
+, BinOp(..)
+, UnOp(..)
 ) where
   
-import System.IO
-import Control.Monad
 import Text.ParserCombinators.Parsec
-import Text.ParserCombinators.Parsec.Expr
 import Text.ParserCombinators.Parsec.Language
 import qualified Text.ParserCombinators.Parsec.Token as Token
 import Data.Maybe (isNothing)
