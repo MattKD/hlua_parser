@@ -43,12 +43,10 @@ exp ::= 'nil' | 'false' | 'true' | Number | String | '...' |
 
 tblLookup ::= '[' exp ']' | '.' Name
 
-functioncall ::= Name {tblLookup} fcallArgs {functioncallTail} |
-                 '(' exp ')' {tblLookup} fcallArgs {functioncallTail}
+functioncall ::= Name fcallArgs {fcallArgs} |
+                 '(' exp ')' fcallArgs {fcallArgs}
 
-functioncallTail ::= {tblLookup} fcallArgs 
-
-fcallArgs ::= args | ':' Name args
+fcallArgs ::= {tblLookup} args | {tblLookup} ':' Name args
 
 args ::=  ‘(’ [explist] ‘)’ | tableconstructor | String 
 

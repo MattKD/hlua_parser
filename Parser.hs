@@ -11,7 +11,6 @@ module Parser
 , Exp(..)
 , TblLookup(..)
 , FnCall(..)
-, FnCallTail(..)
 , FnCallArgs(..)
 , Args(..)
 , FuncBody(..)
@@ -71,14 +70,12 @@ data Exp = NilExp | FalseExp | TrueExp | NumberExp Double | StringExp String |
 data TblLookup = NameTblLookup String | ExpTblLookup Exp
                  deriving (Show)
 
-data FnCall = NameFnCall String [FnCallTail] |
-              ExpFnCall Exp [FnCallTail]
+data FnCall = NameFnCall String [FnCallArgs] |
+              ExpFnCall Exp [FnCallArgs]
               deriving (Show)
 
-data FnCallTail = FnCallTail [TblLookup] FnCallArgs
-                  deriving (Show)
-
-data FnCallArgs = FnCallArgs Args | TblFnCallArgs String Args 
+data FnCallArgs = FnCallArgs [TblLookup] Args | 
+                  TblFnCallArgs [TblLookup] String Args 
                   deriving (Show)
 
 data Args = ExpArgs [Exp] | TblCtorArgs [Field] | StrArgs String
@@ -354,30 +351,26 @@ parseFnCall = nameFnCall <|> expFnCall
   where
     nameFnCall = do
       id <- identifier
-      fnCallTail <- many1 $ try parseFnCallTail
-      return $ NameFnCall id fnCallTail
+      fnCallArgs <- many1 $ try parseFnCallArgs
+      return $ NameFnCall id fnCallArgs
     expFnCall = do
       exp <- parens parseExp
-      fnCallTail <- many1 $ try parseFnCallTail
-      return $ ExpFnCall exp fnCallTail
+      fnCallArgs <- many1 $ try parseFnCallArgs
+      return $ ExpFnCall exp fnCallArgs
 
-parseFnCallTail :: Parser FnCallTail
-parseFnCallTail = do
-  tblLookups <- many parseTblLookup
-  fnCallArgs <- parseFnCallArgs
-  return $ FnCallTail tblLookups fnCallArgs
-  
 parseFnCallArgs :: Parser FnCallArgs
-parseFnCallArgs = args <|> tblArgs 
+parseFnCallArgs = do
+  ts <- many parseTblLookup
+  args ts <|> tblArgs ts
   where
-    args = do
+    args ts = do
       a <- parseArgs
-      return $ FnCallArgs a 
-    tblArgs = do
+      return $ FnCallArgs ts a 
+    tblArgs ts = do
       reservedOp ":"
       id <- identifier
       a <- parseArgs
-      return $ TblFnCallArgs id a    
+      return $ TblFnCallArgs ts id a   
  
 parseArgs :: Parser Args
 parseArgs = expArgs <|> tblCtorArgs <|> strArgs 
