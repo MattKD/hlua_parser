@@ -5,11 +5,11 @@ To test converting Lua source to the AST, run parser-test -i "Lua src", or parse
 
 Example:
 ```
-parser-test -i "n = foo() + 3"
+parser-test -i "n = foo() + 3 * 2"
 ```
 Prints:
 ```
-Chunk [AssignStat [NameVar "n" []] [PExpExp (FnCallPExp (NameFnCall "foo" [FnCal
-lTail [] (FnCallArgs (ExpArgs []))]) []) [ExpTail AddBinOp (NumberExp 3.0 [])]]]
- Nothing
+Chunk [AssignStat [NameVar "n" []] [BinExp AddBinOp (FnCallExp (NameFnCall "foo"
+ [FnCallArgs [] (ExpArgs [])]) []) (BinExp MultBinOp (NumberExp 3.0) (NumberExp
+2.0))]] Nothing
 ```
