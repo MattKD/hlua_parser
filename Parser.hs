@@ -9,7 +9,6 @@ module Parser
 , RetStat(..)
 , Var(..)
 , Exp(..)
-, ExpTail(..)
 , TblLookup(..)
 , FnCall(..)
 , FnCallTail(..)
@@ -24,6 +23,7 @@ module Parser
   
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Language
+import Text.ParserCombinators.Parsec.Expr
 import qualified Text.ParserCombinators.Parsec.Token as Token
 import Data.Maybe (isNothing)
 
@@ -62,17 +62,11 @@ data Var = NameVar String [TblLookup] |
            ExpVar Exp [TblLookup]
            deriving (Show)
 
-data Exp = NilExp [ExpTail] | FalseExp [ExpTail] | TrueExp [ExpTail] | 
-           NumberExp Double [ExpTail] | StringExp String [ExpTail] | 
-           VarArgExp [ExpTail] | FuncExp FuncBody [ExpTail] | 
-           NameExp String [TblLookup] [ExpTail] | 
-           FnCallExp FnCall [TblLookup] [ExpTail] |
-           ParenExp Exp [TblLookup] [ExpTail] |
-           TblCtorExp [Field] [ExpTail] | UnOpExp UnOp Exp [ExpTail] 
+data Exp = NilExp | FalseExp | TrueExp | NumberExp Double | StringExp String | 
+           VarArgExp | FuncExp FuncBody | NameExp String [TblLookup] | 
+           FnCallExp FnCall [TblLookup] | TblCtorExp [Field] | 
+           BinExp BinOp Exp Exp | UnOpExp UnOp Exp  
            deriving (Show)
-
-data ExpTail = ExpTail BinOp Exp
-               deriving (Show)
 
 data TblLookup = NameTblLookup String | ExpTblLookup Exp
                  deriving (Show)
@@ -284,70 +278,65 @@ parseNameList = sepBy1 identifier comma
 parseExpList :: Parser [Exp]
 parseExpList = sepBy1 parseExp comma
 
-parseExp :: Parser Exp
-parseExp = nilExp <|> falseExp <|> trueExp <|> strExp <|> varArgExp <|>
-           fnDefExp <|> (try fnCallExp) <|> nameExp <|> parenExp <|> 
-           tblCtorExp <|> (try numExp) <|> unopExp
-  where
-    nilExp = do 
-      reserved "nil" 
-      expTail <- many parseExpTail
-      return $ NilExp expTail
-    falseExp = do
-      reserved "false" 
-      expTail <- many parseExpTail
-      return $ FalseExp expTail
-    trueExp = do
-      reserved "true"
-      expTail <- many parseExpTail
-      return $ TrueExp expTail
-    numExp = do
-      n <- parseNumber
-      expTail <- many parseExpTail
-      return $ NumberExp n expTail
-    strExp = do
-      s <- stringLiteral
-      expTail <- many parseExpTail
-      return $ StringExp s expTail
-    varArgExp = do 
-      reservedOp "..."
-      expTail <- many parseExpTail
-      return $ VarArgExp expTail
-    fnDefExp = do
-      reserved "function"
-      funcBody <- parseFuncBody
-      expTail <- many parseExpTail
-      return $ FuncExp funcBody expTail
-    fnCallExp = do
-      f <- parseFnCall
-      tblLookups <- many parseTblLookup
-      expTail <- many parseExpTail
-      return $ FnCallExp f tblLookups expTail
-    nameExp = do
-      id <- identifier
-      tblLookups <- many parseTblLookup
-      expTail <- many parseExpTail
-      return $ NameExp id tblLookups expTail
-    parenExp = do
-      exp <- parens parseExp
-      tblLookups <- many parseTblLookup
-      expTail <- many parseExpTail
-      return $ ParenExp exp tblLookups expTail 
-    tblCtorExp = do
-      fieldlist <- parseTblCtor
-      expTail <- many parseExpTail
-      return $ TblCtorExp fieldlist expTail 
-    unopExp = do
-      unOp <- parseUnOp 
-      exp <- parseExp
-      expTail <- many parseExpTail
-      return $ UnOpExp unOp exp expTail
+parseExp = buildExpressionParser opTable parseExpTerm where
+  parseExpTerm = parens parseExp <|> exp
 
-parseExpTail :: Parser ExpTail
-parseExpTail = do
-  binOp <- parseBinOp
-  exp <- parseExp
-  return $ ExpTail binOp exp
+  opTable = 
+    [[Infix  (reservedOp "^" >> return (BinExp ExpBinOp)) AssocLeft],
+
+     [Prefix (reserved "not" >> return (UnOpExp NotUnOp)),
+      Prefix (reservedOp "#" >> return (UnOpExp HashUnOp)),
+      Prefix (reservedOp "-" >> return (UnOpExp NegateUnOp))],
+
+     [Infix  (reservedOp "*" >> return (BinExp MultBinOp)) AssocLeft,
+      Infix  (reservedOp "/" >> return (BinExp DivBinOp)) AssocLeft,
+      Infix  (reservedOp "%" >> return (BinExp ModBinOp)) AssocLeft],
+
+     [Infix  (reservedOp "+" >> return (BinExp AddBinOp)) AssocLeft,
+      Infix  (reservedOp "-" >> return (BinExp SubBinOp)) AssocLeft],
+
+     [Infix  (reservedOp ">" >> return (BinExp GTBinOp)) AssocLeft,
+      Infix  (reservedOp ">=" >> return (BinExp GTEBinOp)) AssocLeft,
+      Infix  (reservedOp "<" >> return (BinExp LTBinOp)) AssocLeft,
+      Infix  (reservedOp "<=" >> return (BinExp LTEBinOp)) AssocLeft,
+      Infix  (reservedOp "~=" >> return (BinExp NEqBinOp)) AssocLeft,
+      Infix  (reservedOp "==" >> return (BinExp EqBinOp)) AssocLeft],
+       
+     [Infix  (reserved "and" >> return (BinExp AndBinOp)) AssocLeft],
+
+     [Infix  (reserved "or" >> return (BinExp OrBinOp)) AssocLeft]
+    ]
+
+  exp = nilExp <|> falseExp <|> trueExp <|> strExp <|> varArgExp <|>
+        fnDefExp <|> (try fnCallExp) <|> nameExp <|> 
+        tblCtorExp <|> numExp
+
+  nilExp = reserved "nil" >> return NilExp
+  falseExp = reserved "false" >> return FalseExp
+  trueExp = reserved "true" >> return TrueExp
+  varArgExp = reservedOp "..." >> return VarArgExp
+  numExp = do
+    n <- parseNumber
+    return $ NumberExp n
+  strExp = do
+    s <- stringLiteral
+    return $ StringExp s
+  fnDefExp = do
+    reserved "function"
+    funcBody <- parseFuncBody
+    return $ FuncExp funcBody
+  fnCallExp = do
+    f <- parseFnCall
+    tblLookups <- many parseTblLookup
+    return $ FnCallExp f tblLookups
+  nameExp = do
+    id <- identifier
+    tblLookups <- many parseTblLookup
+    return $ NameExp id tblLookups
+  tblCtorExp = do
+    fieldlist <- parseTblCtor
+    return $ TblCtorExp fieldlist
+
 
 parseTblLookup :: Parser TblLookup
 parseTblLookup = expTblLookup <|> nameTblLookup 
@@ -444,32 +433,4 @@ parseField = expExpField <|> (try nameExpField) <|> expField
       e <- parseExp
       return $ ExpField e
 
-parseBinOp :: Parser BinOp
-parseBinOp = addBinOp <|> subBinOp <|> multBinOp <|> divBinOp <|> 
-             expBinOp <|> modBinOp <|> concatBinOp <|> ltBinOp <|>
-             lteBinOp <|> gtBinOp <|> gteBinOp <|> eqBinOp <|> neqBinOp <|>
-             andBinOp <|> orBinOp 
-  where
-    addBinOp = reservedOp "+" >> return AddBinOp
-    subBinOp = reservedOp "-" >> return SubBinOp
-    multBinOp = reservedOp "*" >> return MultBinOp
-    divBinOp = reservedOp "/" >> return DivBinOp
-    expBinOp = reservedOp "^" >> return ExpBinOp
-    modBinOp = reservedOp "%" >> return ModBinOp
-    concatBinOp = reservedOp ".." >> return ConcatBinOp
-    ltBinOp = reservedOp "<" >> return LTBinOp
-    lteBinOp = reservedOp "<=" >> return LTEBinOp
-    gtBinOp = reservedOp ">" >> return GTBinOp
-    gteBinOp = reservedOp ">=" >> return GTEBinOp
-    eqBinOp = reservedOp "==" >> return EqBinOp
-    neqBinOp = reservedOp "~=" >> return NEqBinOp
-    andBinOp = reserved "and" >> return AndBinOp
-    orBinOp = reserved "or" >> return OrBinOp
-
-parseUnOp :: Parser UnOp
-parseUnOp = negateOp <|> notOp <|> hashOp 
-  where
-    negateOp = reservedOp "-" >> return NegateUnOp
-    notOp = reserved "not" >> return NotUnOp
-    hashOp = reservedOp "#" >> return HashUnOp
 

@@ -37,13 +37,9 @@ namelist ::= Name {‘,’ Name}
 
 explist ::= exp {‘,’ exp}
 
-exp ::= 'nil' {expTail} | 'false' {expTail} | 'true' {expTail} | 
-        Number {expTail} | String {expTail} | '...' {expTail} | 
-        functiondef {expTail} | Name {tblLookup} {expTail} | 
-        functioncall {tblLookup} {expTail} | '(' exp ')' {tblLookup} {expTail}  
-        tableconstructor {expTail} | unop exp {expTail}  
-
-expTail ::= binop exp 
+exp ::= 'nil' | 'false' | 'true' | Number | String | '...' | 
+        functiondef | Name {tblLookup} | functioncall {tblLookup} | 
+        '(' exp ')' {tblLookup} | tableconstructor | exp binop exp | unop exp  
 
 tblLookup ::= '[' exp ']' | '.' Name
 
