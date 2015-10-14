@@ -10,7 +10,6 @@ module Parser
 , Var(..)
 , Exp(..)
 , ExpTail(..)
-, PExp(..)
 , TblLookup(..)
 , FnCall(..)
 , FnCallTail(..)
@@ -66,16 +65,14 @@ data Var = NameVar String [TblLookup] |
 data Exp = NilExp [ExpTail] | FalseExp [ExpTail] | TrueExp [ExpTail] | 
            NumberExp Double [ExpTail] | StringExp String [ExpTail] | 
            VarArgExp [ExpTail] | FuncExp FuncBody [ExpTail] | 
-           PExpExp PExp [ExpTail] | TblCtorExp [Field] [ExpTail] | 
-           UnOpExp UnOp Exp [ExpTail] 
+           NameExp String [TblLookup] [ExpTail] | 
+           FnCallExp FnCall [TblLookup] [ExpTail] |
+           ParenExp Exp [TblLookup] [ExpTail] |
+           TblCtorExp [Field] [ExpTail] | UnOpExp UnOp Exp [ExpTail] 
            deriving (Show)
 
 data ExpTail = ExpTail BinOp Exp
                deriving (Show)
-
-data PExp = NamePExp String [TblLookup] | FnCallPExp FnCall [TblLookup] |
-            ExpPExp Exp [TblLookup]
-            deriving (Show)
 
 data TblLookup = NameTblLookup String | ExpTblLookup Exp
                  deriving (Show)
@@ -289,7 +286,8 @@ parseExpList = sepBy1 parseExp comma
 
 parseExp :: Parser Exp
 parseExp = nilExp <|> falseExp <|> trueExp <|> strExp <|> varArgExp <|>
-           fnDefExp <|> pexpExp <|> tblCtorExp <|> (try numExp) <|> unopExp
+           fnDefExp <|> (try fnCallExp) <|> nameExp <|> parenExp <|> 
+           tblCtorExp <|> (try numExp) <|> unopExp
   where
     nilExp = do 
       reserved "nil" 
@@ -320,10 +318,21 @@ parseExp = nilExp <|> falseExp <|> trueExp <|> strExp <|> varArgExp <|>
       funcBody <- parseFuncBody
       expTail <- many parseExpTail
       return $ FuncExp funcBody expTail
-    pexpExp = do
-      pexp <- parsePExp
+    fnCallExp = do
+      f <- parseFnCall
+      tblLookups <- many parseTblLookup
       expTail <- many parseExpTail
-      return $ PExpExp pexp expTail
+      return $ FnCallExp f tblLookups expTail
+    nameExp = do
+      id <- identifier
+      tblLookups <- many parseTblLookup
+      expTail <- many parseExpTail
+      return $ NameExp id tblLookups expTail
+    parenExp = do
+      exp <- parens parseExp
+      tblLookups <- many parseTblLookup
+      expTail <- many parseExpTail
+      return $ ParenExp exp tblLookups expTail 
     tblCtorExp = do
       fieldlist <- parseTblCtor
       expTail <- many parseExpTail
@@ -339,22 +348,6 @@ parseExpTail = do
   binOp <- parseBinOp
   exp <- parseExp
   return $ ExpTail binOp exp
-
-parsePExp :: Parser PExp
-parsePExp = (try fnCallPExp) <|> namePExp <|> expPExp 
-  where
-    fnCallPExp = do
-      f <- parseFnCall
-      tblLookups <- many parseTblLookup
-      return $ FnCallPExp f tblLookups
-    namePExp = do
-      id <- identifier
-      tblLookups <- many parseTblLookup
-      return $ NamePExp id tblLookups
-    expPExp = do
-      exp <- parens parseExp
-      tblLookups <- many parseTblLookup
-      return $ ExpPExp exp tblLookups
 
 parseTblLookup :: Parser TblLookup
 parseTblLookup = expTblLookup <|> nameTblLookup 

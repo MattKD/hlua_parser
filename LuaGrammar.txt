@@ -39,13 +39,11 @@ explist ::= exp {‘,’ exp}
 
 exp ::= 'nil' {expTail} | 'false' {expTail} | 'true' {expTail} | 
         Number {expTail} | String {expTail} | '...' {expTail} | 
-        functiondef {expTail} | prefixexp {expTail} | 
+        functiondef {expTail} | Name {tblLookup} {expTail} | 
+        functioncall {tblLookup} {expTail} | '(' exp ')' {tblLookup} {expTail}  
         tableconstructor {expTail} | unop exp {expTail}  
 
 expTail ::= binop exp 
-
-prefixexp ::= Name {tblLookup} | functioncall {tblLookup} |
-              '(' exp ')' {tblLookup}  
 
 tblLookup ::= '[' exp ']' | '.' Name
 
